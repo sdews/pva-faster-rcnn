@@ -37,25 +37,33 @@ NETS = {'vgg16': ('VGG16',
                   'ZF_faster_rcnn_final.caffemodel')}
 
 
-def vis_detections(im, class_name, dets, thresh=0.5):
-    """Draw detected bounding boxes."""
-    inds = np.where(dets[:, -1] >= thresh)[0]
+def vis_detections(im, class_name, dets, ax, thresh=0.5):
+    """
+    Draw detected bounding boxes.
+    add the 'ax' as a global variable.
+    """
+
+    inds = np.where(dets[:, -1] >= thresh)[0]  # dets中scores>=thresh的行索引
     if len(inds) == 0:
         return
 
-    im = im[:, :, (2, 1, 0)]
-    fig, ax = plt.subplots(figsize=(12, 12))
-    ax.imshow(im, aspect='equal')
+#     im = im[:, :, (2, 1, 0)]
+#     # 定义画布和图形, fig: matplotlib.figure.Figure object, ax : Axes object or array of Axes objects
+#     fig, ax = plt.subplots(figsize=(12, 12))
+#     # Display an image on the axes, changes the axes equal ratio to match that of the image.
+#     ax.imshow(im, aspect='equal')  
+
     for i in inds:
         bbox = dets[i, :4]
         score = dets[i, -1]
-
+        # 画矩形框
         ax.add_patch(
             plt.Rectangle((bbox[0], bbox[1]),
                           bbox[2] - bbox[0],
                           bbox[3] - bbox[1], fill=False,
                           edgecolor='red', linewidth=3.5)
             )
+        # 在矩形框下添加标签及得分
         ax.text(bbox[0], bbox[1] - 2,
                 '{:s} {:.3f}'.format(class_name, score),
                 bbox=dict(facecolor='blue', alpha=0.5),
@@ -65,9 +73,9 @@ def vis_detections(im, class_name, dets, thresh=0.5):
                   'p({} | box) >= {:.1f}').format(class_name, class_name,
                                                   thresh),
                   fontsize=14)
-    plt.axis('off')
-    plt.tight_layout()
-    plt.draw()
+#     plt.axis('off')
+#     plt.tight_layout()
+#     plt.draw()
 
 def demo(net, image_name):
     """Detect object classes in an image using pre-computed object proposals."""
@@ -79,7 +87,7 @@ def demo(net, image_name):
     # Detect all object classes and regress object bounds
     timer = Timer()
     timer.tic()
-    scores, boxes = im_detect(net, im)
+    scores, boxes = im_detect(net, im)  # scores: R × K, boxes: R × (4*K)
     timer.toc()
     print ('Detection took {:.3f}s for '
            '{:d} object proposals').format(timer.total_time, boxes.shape[0])
@@ -87,15 +95,27 @@ def demo(net, image_name):
     # Visualize detections for each class
     CONF_THRESH = 0.8
     NMS_THRESH = 0.3
+    # ------------added Newly--------------
+    im = im[:, :, (2, 1, 0)]
+    # 定义画布和图形, fig: matplotlib.figure.Figure object, ax : Axes object or array of Axes objects
+    fig, ax = plt.subplots(figsize=(12, 12))
+    # Display an image on the axes, changes the axes equal ratio to match that of the image.
+    ax.imshow(im, aspect='equal')         
+    # -------------------------------------       
     for cls_ind, cls in enumerate(CLASSES[1:]):
         cls_ind += 1 # because we skipped background
-        cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
-        cls_scores = scores[:, cls_ind]
-        dets = np.hstack((cls_boxes,
-                          cls_scores[:, np.newaxis])).astype(np.float32)
-        keep = nms(dets, NMS_THRESH)
-        dets = dets[keep, :]
-        vis_detections(im, cls, dets, thresh=CONF_THRESH)
+        cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]  # cls_boxes: R x 4 array for a class
+        cls_scores = scores[:, cls_ind]  # cls_scores: R x 1 array for a class 
+        dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])).astype(np.float32) 
+        # np.newaxis让cls_scores多了一维, dets: R × 5 array for a class 
+        keep = nms(dets, NMS_THRESH)  #  keep是指通过非线性极大抑制nms得到的proposals的索引, 即dets的列索引 
+        dets = dets[keep, :]  
+        vis_detections(im, cls, dets, ax, thresh=CONF_THRESH)  # add the 'ax'
+    # ------------added Newly--------------
+    plt.axis('off')
+    plt.tight_layout()
+    plt.draw()
+    # -------------------------------------
 
 def parse_args():
     """Parse input arguments."""
